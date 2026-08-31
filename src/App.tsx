@@ -4,6 +4,7 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { LoginPage } from '@/pages/LoginPage';
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { PatientsPage } from '@/features/patients/PatientsPage';
 import { PatientProfilePage } from '@/features/patients/PatientProfilePage';
@@ -21,6 +22,7 @@ export default function App() {
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Authenticated app (both roles) */}
           <Route element={<ProtectedRoute />}>

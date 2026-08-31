@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Spinner } from '@/components/ui/Spinner';
+import { ForgotPasswordModal } from '@/features/auth/ForgotPasswordModal';
 import logo from '@/assets/logo.png';
 
 export function LoginPage() {
@@ -11,6 +12,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   if (!loading && session) return <Navigate to="/" replace />;
 
@@ -82,8 +84,22 @@ export function LoginPage() {
           <button type="submit" className="btn-primary w-full" disabled={submitting || !configured}>
             {submitting ? <Spinner className="h-4 w-4 text-white" /> : 'Sign in'}
           </button>
+
+          <button
+            type="button"
+            onClick={() => setForgotOpen(true)}
+            className="w-full text-center text-sm text-brand-green-700 hover:underline"
+          >
+            Forgot password?
+          </button>
         </form>
       </div>
+
+      <ForgotPasswordModal
+        open={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        initialEmail={email}
+      />
     </div>
   );
 }
