@@ -81,7 +81,7 @@ export function CompleteAppointmentModal({ open, onClose, onCompleted, appointme
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Treatment done" htmlFor="c_treatment">
             <input
               id="c_treatment"
@@ -101,7 +101,7 @@ export function CompleteAppointmentModal({ open, onClose, onCompleted, appointme
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Next treatment" htmlFor="c_next" hint="Optional — schedules a reminder.">
             <input
               id="c_next"
