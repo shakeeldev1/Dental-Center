@@ -22,11 +22,17 @@ export async function audienceCount(type: AudienceType): Promise<number> {
   return res.count;
 }
 
+export interface CampaignRecipientInput {
+  name: string | null;
+  phone: string;
+}
+
 export interface CreateCampaignInput {
   name: string;
   offer?: string;
   message: string;
   audience_type: AudienceType;
+  recipients?: CampaignRecipientInput[];
 }
 
 export async function createCampaign(input: CreateCampaignInput): Promise<Campaign> {
