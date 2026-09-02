@@ -45,3 +45,7 @@ export async function setUserRole(id: string, role: Role): Promise<void> {
   const { error } = await requireClient().from('users').update({ role }).eq('id', id);
   if (error) throw new Error(error.message);
 }
+
+export async function deleteUser(id: string): Promise<void> {
+  await apiFetch<{ id: string }>(`/users/${id}`, { method: 'DELETE' });
+}

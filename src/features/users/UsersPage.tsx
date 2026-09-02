@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/context/AuthContext';
-import { listUsers, setUserActive, setUserRole, type StaffUser } from './api';
+import { listUsers, setUserActive, setUserRole, deleteUser, type StaffUser } from './api';
 import { NewUserModal } from './NewUserModal';
 import type { Role } from '@/types';
 
@@ -16,6 +17,8 @@ export function UsersPage() {
   const [rows, setRows] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<StaffUser | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -48,6 +51,21 @@ export function UsersPage() {
       void load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not update role.');
+    }
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteUser(pendingDelete.id);
+      toast.success('User deleted.');
+      setPendingDelete(null);
+      void load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not delete user.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -112,14 +130,24 @@ export function UsersPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          variant={u.is_active ? 'secondary' : 'primary'}
-                          onClick={() => void toggleActive(u)}
-                          disabled={isSelf}
-                          title={isSelf ? 'You cannot deactivate your own account' : undefined}
-                        >
-                          {u.is_active ? 'Deactivate' : 'Activate'}
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant={u.is_active ? 'secondary' : 'primary'}
+                            onClick={() => void toggleActive(u)}
+                            disabled={isSelf}
+                            title={isSelf ? 'You cannot deactivate your own account' : undefined}
+                          >
+                            {u.is_active ? 'Deactivate' : 'Activate'}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            onClick={() => setPendingDelete(u)}
+                            disabled={isSelf}
+                            title={isSelf ? 'You cannot delete your own account' : undefined}
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -131,6 +159,28 @@ export function UsersPage() {
       </div>
 
       <NewUserModal open={formOpen} onClose={() => setFormOpen(false)} onCreated={() => void load()} />
+
+      <Modal
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title="Delete user"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPendingDelete(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={() => void confirmDelete()} loading={deleting}>
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-brand-ink-600">
+          Are you sure you want to permanently delete{' '}
+          <span className="font-medium text-brand-ink-800">{pendingDelete?.full_name}</span> (
+          {pendingDelete?.email})? This will remove their login and cannot be undone.
+        </p>
+      </Modal>
     </div>
   );
 }
