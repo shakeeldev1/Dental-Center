@@ -1,4 +1,4 @@
-export type AudienceType = 'all' | 'recent' | 'inactive' | 'csv';
+export type AudienceType = 'all' | 'recent' | 'inactive' | 'csv' | 'segment';
 export type CampaignStatus = 'draft' | 'sending' | 'completed' | 'failed';
 
 export interface Campaign {
@@ -7,6 +7,7 @@ export interface Campaign {
   offer: string | null;
   message: string;
   audience_type: AudienceType;
+  segment_filters: Record<string, unknown> | null;
   status: CampaignStatus;
   total_recipients: number;
   sent_count: number;
@@ -20,6 +21,7 @@ export const AUDIENCE_LABEL: Record<AudienceType, string> = {
   recent: 'Recent patients',
   inactive: 'Inactive patients',
   csv: 'Custom list (upload CSV)',
+  segment: 'Segment (custom filters)',
 };
 
 export const CAMPAIGN_STATUS_TONE: Record<CampaignStatus, 'gray' | 'amber' | 'green' | 'red'> = {

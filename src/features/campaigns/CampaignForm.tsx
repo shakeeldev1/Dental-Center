@@ -8,6 +8,8 @@ import { useToast } from '@/components/ui/Toast';
 import { audienceCount, createCampaign } from './api';
 import { AUDIENCE_LABEL, type AudienceType } from './types';
 import { parseCsv, classifyContactRows, type ContactsPreview } from './contacts';
+import { SegmentFilterBuilder } from './SegmentFilterBuilder';
+import { isEmptySegmentFilters, type SegmentFilters } from '@/features/patients/segment';
 
 const DEFAULT_MESSAGE =
   'Hello {{patient_name}},\n\nWe have a special offer for you:\n\n{{offer}}\n\nContact us to book your appointment.';
@@ -24,6 +26,7 @@ export function CampaignForm({ open, onClose, onCreated }: Props) {
   const [offer, setOffer] = useState('');
   const [message, setMessage] = useState(DEFAULT_MESSAGE);
   const [audience, setAudience] = useState<AudienceType>('all');
+  const [segmentFilters, setSegmentFilters] = useState<SegmentFilters>({});
   const [count, setCount] = useState<number | null>(null);
   const [contactsPreview, setContactsPreview] = useState<ContactsPreview | null>(null);
   const [parsingCsv, setParsingCsv] = useState(false);
@@ -37,6 +40,7 @@ export function CampaignForm({ open, onClose, onCreated }: Props) {
       setOffer('');
       setMessage(DEFAULT_MESSAGE);
       setAudience('all');
+      setSegmentFilters({});
       setContactsPreview(null);
       setErrors({});
       if (fileRef.current) fileRef.current.value = '';
@@ -47,13 +51,16 @@ export function CampaignForm({ open, onClose, onCreated }: Props) {
     if (!open || audience === 'csv') return;
     let active = true;
     setCount(null);
-    audienceCount(audience)
-      .then((c) => active && setCount(c))
-      .catch(() => active && setCount(null));
+    const t = setTimeout(() => {
+      audienceCount(audience, audience === 'segment' ? segmentFilters : undefined)
+        .then((c) => active && setCount(c))
+        .catch(() => active && setCount(null));
+    }, 300);
     return () => {
       active = false;
+      clearTimeout(t);
     };
-  }, [audience, open]);
+  }, [audience, segmentFilters, open]);
 
   useEffect(() => {
     if (audience !== 'csv') {
@@ -81,6 +88,9 @@ export function CampaignForm({ open, onClose, onCreated }: Props) {
     if (audience === 'csv' && (!contactsPreview || contactsPreview.valid === 0)) {
       next.audience = 'Upload a CSV with at least one valid contact.';
     }
+    if (audience === 'segment' && isEmptySegmentFilters(segmentFilters)) {
+      next.audience = 'Set at least one filter for a segment audience.';
+    }
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
@@ -99,6 +109,7 @@ export function CampaignForm({ open, onClose, onCreated }: Props) {
         message: message.trim(),
         audience_type: audience,
         recipients,
+        segment_filters: audience === 'segment' ? segmentFilters : undefined,
       });
       toast.success('Campaign created.');
       onCreated();
@@ -169,7 +180,7 @@ export function CampaignForm({ open, onClose, onCreated }: Props) {
             value={audience}
             onChange={(e) => setAudience(e.target.value as AudienceType)}
           >
-            {(['all', 'recent', 'inactive', 'csv'] as AudienceType[]).map((a) => (
+            {(['all', 'recent', 'inactive', 'segment', 'csv'] as AudienceType[]).map((a) => (
               <option key={a} value={a}>
                 {AUDIENCE_LABEL[a]}
               </option>
@@ -181,6 +192,10 @@ export function CampaignForm({ open, onClose, onCreated }: Props) {
             </p>
           )}
         </Field>
+
+        {audience === 'segment' && (
+          <SegmentFilterBuilder value={segmentFilters} onChange={setSegmentFilters} />
+        )}
 
         {audience === 'csv' && (
           <div className="space-y-3">

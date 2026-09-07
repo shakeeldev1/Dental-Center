@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { apiFetch } from '@/lib/api';
+import type { SegmentFilters } from '@/features/patients/segment';
 import type { AudienceType, Campaign } from './types';
 
 function requireClient() {
@@ -17,8 +18,10 @@ export async function listCampaigns(): Promise<Campaign[]> {
   return (data ?? []) as Campaign[];
 }
 
-export async function audienceCount(type: AudienceType): Promise<number> {
-  const res = await apiFetch<{ count: number }>(`/campaigns/audience-count?type=${type}`);
+export async function audienceCount(type: AudienceType, filters?: SegmentFilters): Promise<number> {
+  const qs = new URLSearchParams({ type });
+  if (filters) qs.set('filters', JSON.stringify(filters));
+  const res = await apiFetch<{ count: number }>(`/campaigns/audience-count?${qs.toString()}`);
   return res.count;
 }
 
@@ -33,6 +36,7 @@ export interface CreateCampaignInput {
   message: string;
   audience_type: AudienceType;
   recipients?: CampaignRecipientInput[];
+  segment_filters?: SegmentFilters;
 }
 
 export async function createCampaign(input: CreateCampaignInput): Promise<Campaign> {

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Patient, PatientInput, PatientOverview } from './types';
+import type { CustomerStatus, Patient, PatientInput, PatientOverview } from './types';
 
 function requireClient() {
   if (!supabase) throw new Error('Supabase is not configured.');
@@ -48,6 +48,36 @@ export async function getPatient(id: string): Promise<Patient> {
   const { data, error } = await db.from('patients').select('*').eq('id', id).single();
   if (error) throw new Error(error.message);
   return data as Patient;
+}
+
+/** Duplicate-detection pre-check: mobile number is the primary identifier (spec §14). */
+export async function checkExistingPatientByPhone(phone: string): Promise<PatientOverview | null> {
+  const db = requireClient();
+  const { data, error } = await db
+    .from('patient_overview')
+    .select('*')
+    .eq('phone', phone)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as PatientOverview | null) ?? null;
+}
+
+export async function setCustomerStatus(id: string, customer_status: CustomerStatus): Promise<void> {
+  const db = requireClient();
+  const { error } = await db.from('patients').update({ customer_status }).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+/** All members sharing a family_id (including the primary contact). */
+export async function listFamilyMembers(familyId: string): Promise<Patient[]> {
+  const db = requireClient();
+  const { data, error } = await db
+    .from('patients')
+    .select('*')
+    .eq('family_id', familyId)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Patient[];
 }
 
 export async function createPatient(input: PatientInput): Promise<Patient> {
@@ -103,7 +133,7 @@ export async function importPatients(rows: ImportRow[]): Promise<{ imported: num
   return { imported: data?.length ?? 0 };
 }
 
-function mapPatientError(error: { code?: string; message: string }): Error {
+export function mapPatientError(error: { code?: string; message: string }): Error {
   // 23505 = unique_violation (phone already exists)
   if (error.code === '23505') {
     return new Error('A patient with this phone number already exists.');

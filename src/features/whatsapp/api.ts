@@ -75,3 +75,11 @@ export async function sendManualMessage(patientId: string, message: string): Pro
     body: JSON.stringify({ patientId, message }),
   });
 }
+
+/** Send a review request directly from a patient's profile (independent of appointment completion). */
+export async function sendReviewToPatient(patientId: string): Promise<SendManualResult> {
+  return apiFetch<SendManualResult>('/whatsapp/send-review', {
+    method: 'POST',
+    body: JSON.stringify({ patientId }),
+  });
+}

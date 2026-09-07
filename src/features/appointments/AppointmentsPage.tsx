@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Pagination } from '@/components/ui/Pagination';
 import { useToast } from '@/components/ui/Toast';
 import { formatDate, formatTime } from '@/lib/format';
-import { listAppointments, setAppointmentStatus, type DateScope } from './api';
+import { listAppointments, setAppointmentStatus, markAppointmentNoShow, type DateScope } from './api';
 import { STATUS_META, STATUS_FILTERS } from './status';
 import { AppointmentForm } from './AppointmentForm';
 import { AppointmentActions } from './AppointmentActions';
@@ -77,6 +77,19 @@ export function AppointmentsPage() {
       void load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not update status.');
+    }
+  }
+
+  async function handleNoShow(a: AppointmentDetails) {
+    try {
+      const res = await markAppointmentNoShow(a.id);
+      toast.success('Marked no show.');
+      if (res.whatsapp.ok) toast.success('WhatsApp follow-up sent.');
+      else toast.error(`Follow-up message not sent: ${res.whatsapp.error ?? 'unknown error'}`);
+      if (res.followUpCreated) toast.success('Reception follow-up task created.');
+      void load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not mark no show.');
     }
   }
 
@@ -207,6 +220,7 @@ export function AppointmentsPage() {
                         }}
                         onStatus={handleStatus}
                         onComplete={(appt) => setCompleteFor(appt)}
+                        onNoShow={handleNoShow}
                       />
                     </td>
                   </tr>

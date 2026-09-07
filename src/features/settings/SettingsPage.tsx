@@ -12,6 +12,8 @@ import {
   type Settings,
   type Template,
 } from './api';
+import { DoctorsSection } from '@/features/doctors/DoctorsSection';
+import { ServicesSection } from '@/features/services/ServicesSection';
 import type { LanguageCode } from '@/types';
 
 export function SettingsPage() {
@@ -163,6 +165,39 @@ export function SettingsPage() {
               onChange={(e) => patch('treatment_reminder_days', parseInt(e.target.value || '0', 10))}
             />
           </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Reminder 1 — hours before appointment"
+              htmlFor="reminder_1_hours"
+              hint="Only fires while the 24-hour reminder above is enabled."
+            >
+              <input
+                id="reminder_1_hours"
+                type="number"
+                min={1}
+                className="input"
+                value={settings.reminder_1_hours_before}
+                onChange={(e) => patch('reminder_1_hours_before', parseInt(e.target.value || '0', 10))}
+              />
+            </Field>
+            <Field
+              label="Reminder 2 — hours before appointment"
+              htmlFor="reminder_2_hours"
+              hint="Only fires while the 2-hour reminder above is enabled."
+            >
+              <input
+                id="reminder_2_hours"
+                type="number"
+                min={1}
+                className="input"
+                value={settings.reminder_2_hours_before}
+                onChange={(e) => patch('reminder_2_hours_before', parseInt(e.target.value || '0', 10))}
+              />
+            </Field>
+          </div>
+          <p className="text-xs text-brand-ink-400">
+            Adjusting these hours does not change the wording of the Reminder templates below.
+          </p>
         </div>
       </section>
 
@@ -171,6 +206,9 @@ export function SettingsPage() {
           Save settings
         </Button>
       </div>
+
+      <DoctorsSection />
+      <ServicesSection />
 
       {/* Templates */}
       <section className="space-y-4">

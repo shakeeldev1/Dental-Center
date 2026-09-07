@@ -10,11 +10,13 @@ interface Props {
   onStatus: (a: AppointmentDetails, status: AppointmentStatus) => void;
   /** When provided, the "Complete" action opens the completion flow instead. */
   onComplete?: (a: AppointmentDetails) => void;
+  /** When provided, the "No-show" action routes through the backend (WhatsApp + follow-up) instead of a plain status update. */
+  onNoShow?: (a: AppointmentDetails) => void;
 }
 
 const MENU_WIDTH = 176; // w-44
 
-export function AppointmentActions({ appointment, onEdit, onStatus, onComplete }: Props) {
+export function AppointmentActions({ appointment, onEdit, onStatus, onComplete, onNoShow }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -85,6 +87,7 @@ export function AppointmentActions({ appointment, onEdit, onStatus, onComplete }
                 onClick={() => {
                   setOpen(false);
                   if (a.to === 'completed' && onComplete) onComplete(appointment);
+                  else if (a.to === 'no_show' && onNoShow) onNoShow(appointment);
                   else onStatus(appointment, a.to);
                 }}
               >

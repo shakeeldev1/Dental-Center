@@ -13,6 +13,8 @@ export interface Settings {
   default_language: LanguageCode;
   reminder_24h_enabled: boolean;
   reminder_2h_enabled: boolean;
+  reminder_1_hours_before: number;
+  reminder_2_hours_before: number;
   treatment_reminder_enabled: boolean;
   treatment_reminder_days: number;
 }
@@ -57,4 +59,5 @@ export const TEMPLATE_LABEL: Record<string, string> = {
   review_request: 'Review Request',
   treatment_reminder: 'Treatment Reminder',
   campaign: 'Campaign',
+  no_show_followup: 'No-Show Follow-up',
 };

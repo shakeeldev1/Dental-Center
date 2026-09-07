@@ -37,6 +37,18 @@ export async function completeAppointment(
   });
 }
 
+export interface NoShowResult {
+  ok: boolean;
+  alreadyMarked: boolean;
+  whatsapp: { ok: boolean; error: string | null };
+  followUpCreated: boolean;
+}
+
+/** Mark No Show via the backend: sends the WhatsApp follow-up + creates a reception follow-up task. */
+export async function markAppointmentNoShow(id: string): Promise<NoShowResult> {
+  return apiFetch<NoShowResult>(`/appointments/${id}/no-show`, { method: 'POST' });
+}
+
 function requireClient() {
   if (!supabase) throw new Error('Supabase is not configured.');
   return supabase;

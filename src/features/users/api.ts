@@ -49,3 +49,19 @@ export async function setUserRole(id: string, role: Role): Promise<void> {
 export async function deleteUser(id: string): Promise<void> {
   await apiFetch<{ id: string }>(`/users/${id}`, { method: 'DELETE' });
 }
+
+export interface StaffDirectoryEntry {
+  id: string;
+  full_name: string;
+  role: Role;
+}
+
+/** Minimal active-staff list (name + role only) for assignment pickers — any staff can read this. */
+export async function listStaffDirectory(): Promise<StaffDirectoryEntry[]> {
+  const { data, error } = await requireClient()
+    .from('staff_directory')
+    .select('id, full_name, role')
+    .order('full_name', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as StaffDirectoryEntry[];
+}
