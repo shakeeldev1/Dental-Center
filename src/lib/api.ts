@@ -18,7 +18,10 @@ export class ApiError extends Error {
  */
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
-  headers.set('Content-Type', 'application/json');
+  // Leave Content-Type unset for FormData so the browser sets the multipart boundary.
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   if (supabase) {
     const {

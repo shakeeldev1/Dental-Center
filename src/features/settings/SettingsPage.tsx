@@ -201,6 +201,40 @@ export function SettingsPage() {
         </div>
       </section>
 
+      {/* Campaigns */}
+      <section className="card space-y-4 p-5">
+        <h2 className="text-sm font-semibold text-brand-ink-700">Campaign sending</h2>
+        <p className="text-xs text-brand-ink-400">
+          Campaigns send gradually rather than all at once — these defaults apply unless a campaign
+          sets its own override. Once a day&apos;s limit is reached, sending automatically continues the
+          next day.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Daily sending limit" htmlFor="campaign_daily_limit">
+            <input
+              id="campaign_daily_limit"
+              type="number"
+              min={1}
+              className="input"
+              value={settings.campaign_daily_limit}
+              onChange={(e) => patch('campaign_daily_limit', parseInt(e.target.value || '0', 10))}
+            />
+          </Field>
+          <Field label="Interval between messages (seconds)" htmlFor="campaign_send_interval">
+            <input
+              id="campaign_send_interval"
+              type="number"
+              min={1}
+              className="input"
+              value={settings.campaign_send_interval_seconds}
+              onChange={(e) =>
+                patch('campaign_send_interval_seconds', parseInt(e.target.value || '0', 10))
+              }
+            />
+          </Field>
+        </div>
+      </section>
+
       <div>
         <Button onClick={saveSettings} loading={savingSettings}>
           Save settings

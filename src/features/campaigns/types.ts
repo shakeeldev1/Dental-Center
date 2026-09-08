@@ -8,10 +8,16 @@ export interface Campaign {
   message: string;
   audience_type: AudienceType;
   segment_filters: Record<string, unknown> | null;
+  image_url: string | null;
   status: CampaignStatus;
   total_recipients: number;
   sent_count: number;
   failed_count: number;
+  daily_limit: number | null;
+  send_interval_seconds: number | null;
+  sent_today: number;
+  sent_today_date: string | null;
+  next_send_at: string | null;
   created_at: string;
   updated_at: string;
 }

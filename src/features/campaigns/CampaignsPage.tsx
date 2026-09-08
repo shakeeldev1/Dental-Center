@@ -6,7 +6,8 @@ import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatDateTime } from '@/lib/format';
+import { getSettings } from '@/features/settings/api';
 import { listCampaigns, audienceCount, sendCampaign } from './api';
 import { CampaignForm } from './CampaignForm';
 import { AUDIENCE_LABEL, CAMPAIGN_STATUS_TONE, type Campaign } from './types';
@@ -19,6 +20,7 @@ export function CampaignsPage() {
   const [sendTarget, setSendTarget] = useState<Campaign | null>(null);
   const [sendCount, setSendCount] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
+  const [defaults, setDefaults] = useState({ dailyLimit: 150, interval: 8 });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
@@ -33,13 +35,16 @@ export function CampaignsPage() {
 
   useEffect(() => {
     void load();
+    getSettings()
+      .then((s) => setDefaults({ dailyLimit: s.campaign_daily_limit, interval: s.campaign_send_interval_seconds }))
+      .catch(() => {});
   }, [load]);
 
-  // Poll while any campaign is actively sending.
+  // Poll while any campaign is actively sending (now a multi-day process).
   useEffect(() => {
     const active = rows.some((c) => c.status === 'sending');
     if (active && !pollRef.current) {
-      pollRef.current = setInterval(() => void load(), 3000);
+      pollRef.current = setInterval(() => void load(), 10000);
     } else if (!active && pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
@@ -111,43 +116,70 @@ export function CampaignsPage() {
                   <th className="px-4 py-3 font-medium">Campaign</th>
                   <th className="px-4 py-3 font-medium">Audience</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Progress</th>
+                  <th className="px-4 py-3 font-medium">Sent / Total</th>
+                  <th className="px-4 py-3 font-medium">Pending</th>
+                  <th className="px-4 py-3 font-medium">Failed</th>
+                  <th className="px-4 py-3 font-medium">Today</th>
+                  <th className="px-4 py-3 font-medium">Next send</th>
                   <th className="px-4 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-ink-50">
-                {rows.map((c) => (
-                  <tr key={c.id} className="hover:bg-brand-ink-50/50">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-brand-ink-800">{c.name}</p>
-                      {c.offer && <p className="text-xs text-brand-ink-400">{c.offer}</p>}
-                      <p className="text-xs text-brand-ink-300">{formatDate(c.created_at)}</p>
-                    </td>
-                    <td className="px-4 py-3 text-brand-ink-600">{AUDIENCE_LABEL[c.audience_type]}</td>
-                    <td className="px-4 py-3">
-                      <Badge tone={CAMPAIGN_STATUS_TONE[c.status]}>{c.status}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-brand-ink-600">
-                      {c.status === 'draft' ? (
-                        '—'
-                      ) : (
-                        <span>
-                          {c.sent_count}/{c.total_recipients} sent
-                          {c.failed_count > 0 && (
-                            <span className="text-red-600"> · {c.failed_count} failed</span>
-                          )}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {c.status === 'draft' && (
-                        <Button variant="secondary" onClick={() => void openSend(c)}>
-                          <Send className="h-4 w-4" /> Send
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((c) => {
+                  const pending = Math.max(0, c.total_recipients - c.sent_count - c.failed_count);
+                  const dailyLimit = c.daily_limit ?? defaults.dailyLimit;
+                  const scheduledToday =
+                    c.status === 'sending' ? Math.min(Math.max(0, dailyLimit - c.sent_today), pending) : 0;
+                  return (
+                    <tr key={c.id} className="hover:bg-brand-ink-50/50">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-brand-ink-800">{c.name}</p>
+                        {c.offer && <p className="text-xs text-brand-ink-400">{c.offer}</p>}
+                        {c.image_url && <p className="text-xs text-brand-ink-300">📷 Includes image</p>}
+                        <p className="text-xs text-brand-ink-300">{formatDate(c.created_at)}</p>
+                      </td>
+                      <td className="px-4 py-3 text-brand-ink-600">{AUDIENCE_LABEL[c.audience_type]}</td>
+                      <td className="px-4 py-3">
+                        <Badge tone={CAMPAIGN_STATUS_TONE[c.status]}>{c.status}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-brand-ink-600">
+                        {c.status === 'draft' ? '—' : `${c.sent_count} / ${c.total_recipients}`}
+                      </td>
+                      <td className="px-4 py-3 text-brand-ink-600">{c.status === 'draft' ? '—' : pending}</td>
+                      <td className="px-4 py-3">
+                        {c.failed_count > 0 ? (
+                          <span className="text-red-600">{c.failed_count}</span>
+                        ) : (
+                          <span className="text-brand-ink-600">0</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-brand-ink-600">
+                        {c.status === 'sending' ? (
+                          <span>
+                            {c.sent_today}/{dailyLimit} sent
+                            {scheduledToday > 0 && (
+                              <span className="block text-xs text-brand-ink-400">
+                                {scheduledToday} more scheduled today
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-brand-ink-600">
+                        {c.status === 'sending' && c.next_send_at ? formatDateTime(c.next_send_at) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {c.status === 'draft' && (
+                          <Button variant="secondary" onClick={() => void openSend(c)}>
+                            <Send className="h-4 w-4" /> Send
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -166,20 +198,28 @@ export function CampaignsPage() {
               Cancel
             </Button>
             <Button onClick={confirmSend} loading={sending} disabled={sendCount === 0}>
-              Send now
+              Start sending
             </Button>
           </>
         }
       >
         {sendTarget && (
-          <p className="text-sm text-brand-ink-600">
-            Send <span className="font-medium text-brand-ink-800">{sendTarget.name}</span> to{' '}
-            <span className="font-medium text-brand-ink-800">
-              {sendCount === null ? '…' : sendCount}
-            </span>{' '}
-            recipient{sendCount === 1 ? '' : 's'} ({AUDIENCE_LABEL[sendTarget.audience_type]}) over
-            WhatsApp? Only send to patients who have opted in to receive messages.
-          </p>
+          <div className="space-y-2 text-sm text-brand-ink-600">
+            <p>
+              Send <span className="font-medium text-brand-ink-800">{sendTarget.name}</span> to{' '}
+              <span className="font-medium text-brand-ink-800">
+                {sendCount === null ? '…' : sendCount}
+              </span>{' '}
+              recipient{sendCount === 1 ? '' : 's'} ({AUDIENCE_LABEL[sendTarget.audience_type]}) over
+              WhatsApp? Only send to patients who have opted in to receive messages.
+            </p>
+            <p className="text-xs text-brand-ink-400">
+              Messages go out gradually — up to{' '}
+              {sendTarget.daily_limit ?? defaults.dailyLimit} per day, one every{' '}
+              {sendTarget.send_interval_seconds ?? defaults.interval} seconds. Large lists will continue
+              automatically over multiple days.
+            </p>
+          </div>
         )}
       </Modal>
     </div>

@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
 import { formatDate } from '@/lib/format';
 import { listUpcomingTreatments } from './api';
+import { TREATMENT_STATUS_META } from './labels';
 import type { UpcomingTreatment } from './types';
 
 export function TreatmentsPage() {
@@ -60,6 +61,7 @@ export function TreatmentsPage() {
                   <th className="px-4 py-3 font-medium">Patient</th>
                   <th className="px-4 py-3 font-medium">Next treatment</th>
                   <th className="px-4 py-3 font-medium">Due date</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Last treatment</th>
                   <th className="px-4 py-3 font-medium">Reminder</th>
                 </tr>
@@ -78,6 +80,11 @@ export function TreatmentsPage() {
                     </td>
                     <td className="px-4 py-3 text-brand-ink-700">{t.next_treatment ?? '—'}</td>
                     <td className="px-4 py-3 text-brand-ink-600">{formatDate(t.next_treatment_date)}</td>
+                    <td className="px-4 py-3">
+                      <Badge tone={TREATMENT_STATUS_META[t.status].tone}>
+                        {TREATMENT_STATUS_META[t.status].label}
+                      </Badge>
+                    </td>
                     <td className="px-4 py-3 text-brand-ink-600">{formatDate(t.treatment_date)}</td>
                     <td className="px-4 py-3">
                       {t.treatment_reminder_sent ? (

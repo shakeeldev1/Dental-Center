@@ -37,6 +37,9 @@ export interface CreateCampaignInput {
   audience_type: AudienceType;
   recipients?: CampaignRecipientInput[];
   segment_filters?: SegmentFilters;
+  image_url?: string;
+  daily_limit?: number;
+  send_interval_seconds?: number;
 }
 
 export async function createCampaign(input: CreateCampaignInput): Promise<Campaign> {

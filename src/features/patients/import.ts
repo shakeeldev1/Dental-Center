@@ -1,4 +1,4 @@
-import Papa from 'papaparse';
+import { readCsvFile, guessColumns, guessColumnByHints, readField, type ColumnGuess } from '@/lib/csv';
 import { normalizePhone } from '@/lib/phone';
 import type { LanguageCode } from '@/types';
 
@@ -21,40 +21,44 @@ export interface ImportPreview {
   duplicates: number;
 }
 
-const NAME_KEYS = ['name', 'full_name', 'fullname', 'patient', 'patient_name'];
-const PHONE_KEYS = ['phone', 'whatsapp', 'number', 'mobile', 'phone_number', 'contact'];
-const EMAIL_KEYS = ['email', 'e-mail', 'mail'];
-const LANG_KEYS = ['preferred_language', 'language', 'lang'];
-
-function pick(row: Record<string, unknown>, keys: string[]): string {
-  for (const k of Object.keys(row)) {
-    if (keys.includes(k.trim().toLowerCase())) return String(row[k] ?? '').trim();
-  }
-  return '';
+export interface ColumnMapping {
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  language: string | null;
 }
 
-export function parseCsv(file: File): Promise<Record<string, unknown>[]> {
-  return new Promise((resolve, reject) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (res) => resolve(res.data as Record<string, unknown>[]),
-      error: reject,
-    });
-  });
+const LANG_HINTS = ['language', 'lang'];
+
+export async function parseCsv(file: File): Promise<{ rawRows: Record<string, string>[]; headers: string[] }> {
+  const { headers, rows } = await readCsvFile(file);
+  if (headers.length === 0) throw new Error('Could not find a header row in this file.');
+  return { rawRows: rows, headers };
 }
 
-/** Classify parsed rows against phones already in the DB (spec §22). */
+/** Auto-detected column mapping; null fields mean the receptionist must confirm manually. */
+export function guessMapping(headers: string[]): ColumnMapping {
+  const g: ColumnGuess = guessColumns(headers);
+  return {
+    name: g.name,
+    phone: g.phone,
+    email: g.email,
+    language: guessColumnByHints(headers, LANG_HINTS),
+  };
+}
+
+/** Classify parsed rows against phones already in the DB (spec §22), using an explicit column mapping. */
 export function classifyRows(
   rawRows: Record<string, unknown>[],
+  mapping: ColumnMapping,
   existingPhones: Set<string>,
 ): ImportPreview {
   const seen = new Set<string>();
   const rows: ParsedPatient[] = rawRows.map((raw) => {
-    const full_name = pick(raw, NAME_KEYS);
-    const rawPhone = pick(raw, PHONE_KEYS);
-    const email = pick(raw, EMAIL_KEYS) || null;
-    const langRaw = pick(raw, LANG_KEYS).toLowerCase();
+    const full_name = readField(raw, mapping.name);
+    const rawPhone = readField(raw, mapping.phone);
+    const email = readField(raw, mapping.email) || null;
+    const langRaw = readField(raw, mapping.language).toLowerCase();
     const preferred_language: LanguageCode = langRaw.startsWith('ar') ? 'ar' : 'en';
     const phone = rawPhone ? normalizePhone(rawPhone) : null;
 
@@ -63,9 +67,12 @@ export function classifyRows(
     if (!full_name) {
       status = 'invalid';
       reason = 'Missing name';
+    } else if (!rawPhone) {
+      status = 'invalid';
+      reason = 'Missing phone';
     } else if (!phone) {
       status = 'invalid';
-      reason = 'Invalid phone';
+      reason = `Invalid phone: "${rawPhone}"`;
     } else if (existingPhones.has(phone) || seen.has(phone)) {
       status = 'duplicate';
       reason = 'Duplicate phone';

@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
 import { UploadCloud } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
+import { Field } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
-import { parseCsv, classifyRows, type ImportPreview } from './import';
+import { parseCsv, classifyRows, guessMapping, type ImportPreview, type ColumnMapping } from './import';
 import { fetchExistingPhones, importPatients } from './api';
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
   onImported: () => void;
 }
 
-type Step = 'select' | 'preview' | 'result';
+type Step = 'select' | 'mapping' | 'preview' | 'result';
 
 interface Result {
   imported: number;
@@ -31,16 +32,25 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: stri
   );
 }
 
+const NONE = '__none__';
+
 export function ImportPatientsModal({ open, onClose, onImported }: Props) {
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>('select');
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [rawRows, setRawRows] = useState<Record<string, string>[]>([]);
+  const [mapping, setMapping] = useState<ColumnMapping>({ name: null, phone: null, email: null, language: null });
+  const [existingPhones, setExistingPhones] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
 
   function reset() {
     setStep('select');
+    setHeaders([]);
+    setRawRows([]);
+    setMapping({ name: null, phone: null, email: null, language: null });
     setPreview(null);
     setResult(null);
     if (fileRef.current) fileRef.current.value = '';
@@ -54,14 +64,32 @@ export function ImportPatientsModal({ open, onClose, onImported }: Props) {
   async function handleFile(file: File) {
     setBusy(true);
     try {
-      const [rows, existing] = await Promise.all([parseCsv(file), fetchExistingPhones()]);
-      setPreview(classifyRows(rows, existing));
-      setStep('preview');
+      const [{ rawRows, headers }, existing] = await Promise.all([parseCsv(file), fetchExistingPhones()]);
+      setRawRows(rawRows);
+      setHeaders(headers);
+      setExistingPhones(existing);
+      const guess = guessMapping(headers);
+      setMapping(guess);
+      if (!guess.name || !guess.phone) {
+        setStep('mapping');
+      } else {
+        setPreview(classifyRows(rawRows, guess, existing));
+        setStep('preview');
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not parse CSV.');
     } finally {
       setBusy(false);
     }
+  }
+
+  function confirmMapping() {
+    if (!mapping.name || !mapping.phone) {
+      toast.error('Select which columns contain the name and phone number.');
+      return;
+    }
+    setPreview(classifyRows(rawRows, mapping, existingPhones));
+    setStep('preview');
   }
 
   async function handleImport() {
@@ -101,10 +129,19 @@ export function ImportPatientsModal({ open, onClose, onImported }: Props) {
       onClose={handleClose}
       title="Import patients from CSV"
       footer={
-        step === 'preview' ? (
+        step === 'mapping' ? (
           <>
             <Button variant="secondary" onClick={reset} disabled={busy}>
               Choose another file
+            </Button>
+            <Button onClick={confirmMapping} disabled={busy}>
+              Continue
+            </Button>
+          </>
+        ) : step === 'preview' ? (
+          <>
+            <Button variant="secondary" onClick={() => setStep('mapping')} disabled={busy}>
+              Remap columns
             </Button>
             <Button onClick={handleImport} loading={busy} disabled={!preview || preview.valid === 0}>
               Import {preview?.valid ?? 0} patient{preview?.valid === 1 ? '' : 's'}
@@ -118,10 +155,10 @@ export function ImportPatientsModal({ open, onClose, onImported }: Props) {
       {step === 'select' && (
         <div className="space-y-4">
           <p className="text-sm text-brand-ink-500">
-            Required columns: <code>name</code>, <code>phone</code>. Optional: <code>email</code>,{' '}
-            <code>preferred_language</code>. Phone numbers are normalized (Qatar +974) and
-            de-duplicated. (<code>last_visit</code> / <code>treatment</code> columns are ignored in
-            this version.)
+            Any column order works — we auto-detect Name, Phone and Email columns by header name, and
+            let you confirm or remap them if we&apos;re not sure. Phone numbers are normalized (Qatar
+            +974 for local numbers, or any international number with a country code) and de-duplicated.
+            Arabic and other UTF-8 text is fully supported.
           </p>
           <button
             onClick={() => fileRef.current?.click()}
@@ -142,6 +179,41 @@ export function ImportPatientsModal({ open, onClose, onImported }: Props) {
               if (f) void handleFile(f);
             }}
           />
+        </div>
+      )}
+
+      {step === 'mapping' && (
+        <div className="space-y-4">
+          <p className="text-sm text-brand-ink-500">
+            We couldn&apos;t confidently detect every column from the header row. Please confirm which
+            column holds each field ({rawRows.length} row{rawRows.length === 1 ? '' : 's'} found).
+          </p>
+          {(
+            [
+              ['name', 'Full name', true],
+              ['phone', 'Phone', true],
+              ['email', 'Email', false],
+              ['language', 'Preferred language', false],
+            ] as const
+          ).map(([key, label, required]) => (
+            <Field key={key} label={label} htmlFor={`map_${key}`} required={required}>
+              <select
+                id={`map_${key}`}
+                className="input"
+                value={mapping[key] ?? NONE}
+                onChange={(e) =>
+                  setMapping((m) => ({ ...m, [key]: e.target.value === NONE ? null : e.target.value }))
+                }
+              >
+                <option value={NONE}>{required ? 'Select a column…' : 'None'}</option>
+                {headers.map((h) => (
+                  <option key={h} value={h}>
+                    {h}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ))}
         </div>
       )}
 

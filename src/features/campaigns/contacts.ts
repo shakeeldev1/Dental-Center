@@ -1,4 +1,4 @@
-import Papa from 'papaparse';
+import { readCsvFile, guessColumns, readField, type ColumnGuess } from '@/lib/csv';
 import { normalizePhone } from '@/lib/phone';
 
 export type ContactRowStatus = 'valid' | 'invalid' | 'duplicate';
@@ -18,40 +18,41 @@ export interface ContactsPreview {
   duplicates: number;
 }
 
-const NAME_KEYS = ['name', 'full_name', 'fullname', 'contact', 'patient_name'];
-const PHONE_KEYS = ['phone', 'whatsapp', 'number', 'mobile', 'phone_number', 'contact_number'];
-
-function pick(row: Record<string, unknown>, keys: string[]): string {
-  for (const k of Object.keys(row)) {
-    if (keys.includes(k.trim().toLowerCase())) return String(row[k] ?? '').trim();
-  }
-  return '';
+export interface ContactColumnMapping {
+  name: string | null;
+  phone: string | null;
 }
 
-export function parseCsv(file: File): Promise<Record<string, unknown>[]> {
-  return new Promise((resolve, reject) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (res) => resolve(res.data as Record<string, unknown>[]),
-      error: reject,
-    });
-  });
+export async function parseCsv(file: File): Promise<{ rawRows: Record<string, string>[]; headers: string[] }> {
+  const { headers, rows } = await readCsvFile(file);
+  if (headers.length === 0) throw new Error('Could not find a header row in this file.');
+  return { rawRows: rows, headers };
 }
 
-/** Classify parsed rows for a campaign contact list. Only phone is required. */
-export function classifyContactRows(rawRows: Record<string, unknown>[]): ContactsPreview {
+export function guessContactMapping(headers: string[]): ContactColumnMapping {
+  const g: ColumnGuess = guessColumns(headers);
+  return { name: g.name, phone: g.phone };
+}
+
+/** Classify parsed rows for a campaign contact list, using an explicit column mapping. Only phone is required. */
+export function classifyContactRows(
+  rawRows: Record<string, unknown>[],
+  mapping: ContactColumnMapping,
+): ContactsPreview {
   const seen = new Set<string>();
   const rows: ParsedContact[] = rawRows.map((raw) => {
-    const name = pick(raw, NAME_KEYS);
-    const rawPhone = pick(raw, PHONE_KEYS);
+    const name = readField(raw, mapping.name);
+    const rawPhone = readField(raw, mapping.phone);
     const phone = rawPhone ? normalizePhone(rawPhone) : null;
 
     let status: ContactRowStatus;
     let reason: string | undefined;
-    if (!phone) {
+    if (!rawPhone) {
       status = 'invalid';
-      reason = 'Invalid phone';
+      reason = 'Missing phone';
+    } else if (!phone) {
+      status = 'invalid';
+      reason = `Invalid phone: "${rawPhone}"`;
     } else if (seen.has(phone)) {
       status = 'duplicate';
       reason = 'Duplicate phone';
