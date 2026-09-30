@@ -49,3 +49,11 @@ export async function createCampaign(input: CreateCampaignInput): Promise<Campai
 export async function sendCampaign(id: string): Promise<{ status: string; total: number }> {
   return apiFetch(`/campaigns/${id}/send`, { method: 'POST' });
 }
+
+export async function cancelCampaign(id: string): Promise<void> {
+  await apiFetch(`/campaigns/${id}/cancel`, { method: 'POST' });
+}
+
+export async function deleteCampaign(id: string): Promise<void> {
+  await apiFetch(`/campaigns/${id}`, { method: 'DELETE' });
+}

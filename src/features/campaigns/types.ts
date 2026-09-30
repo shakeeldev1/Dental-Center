@@ -1,5 +1,5 @@
 export type AudienceType = 'all' | 'recent' | 'inactive' | 'csv' | 'segment';
-export type CampaignStatus = 'draft' | 'sending' | 'completed' | 'failed';
+export type CampaignStatus = 'draft' | 'sending' | 'completed' | 'failed' | 'cancelled';
 
 export interface Campaign {
   id: string;
@@ -35,4 +35,5 @@ export const CAMPAIGN_STATUS_TONE: Record<CampaignStatus, 'gray' | 'amber' | 'gr
   sending: 'amber',
   completed: 'green',
   failed: 'red',
+  cancelled: 'gray',
 };

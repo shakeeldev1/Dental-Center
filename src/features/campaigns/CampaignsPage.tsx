@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Megaphone, Send } from 'lucide-react';
+import { Ban, Megaphone, Send, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
@@ -8,7 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { getSettings } from '@/features/settings/api';
-import { listCampaigns, audienceCount, sendCampaign } from './api';
+import { cancelCampaign, deleteCampaign, listCampaigns, audienceCount, sendCampaign } from './api';
 import { CampaignForm } from './CampaignForm';
 import { AUDIENCE_LABEL, CAMPAIGN_STATUS_TONE, type Campaign } from './types';
 
@@ -20,6 +20,9 @@ export function CampaignsPage() {
   const [sendTarget, setSendTarget] = useState<Campaign | null>(null);
   const [sendCount, setSendCount] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
+  const [actionTarget, setActionTarget] = useState<Campaign | null>(null);
+  const [actionType, setActionType] = useState<'cancel' | 'delete' | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const [defaults, setDefaults] = useState({ dailyLimit: 150, interval: 8 });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -79,6 +82,27 @@ export function CampaignsPage() {
       toast.error(err instanceof Error ? err.message : 'Could not start campaign.');
     } finally {
       setSending(false);
+    }
+  }
+
+  async function confirmAction() {
+    if (!actionTarget || !actionType) return;
+    setActionBusy(true);
+    try {
+      if (actionType === 'cancel') {
+        await cancelCampaign(actionTarget.id);
+        toast.success('Campaign cancelled.');
+      } else {
+        await deleteCampaign(actionTarget.id);
+        toast.success('Campaign deleted.');
+      }
+      setActionTarget(null);
+      setActionType(null);
+      void load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not update campaign.');
+    } finally {
+      setActionBusy(false);
     }
   }
 
@@ -171,11 +195,37 @@ export function CampaignsPage() {
                         {c.status === 'sending' && c.next_send_at ? formatDateTime(c.next_send_at) : '—'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {c.status === 'draft' && (
-                          <Button variant="secondary" onClick={() => void openSend(c)}>
-                            <Send className="h-4 w-4" /> Send
-                          </Button>
-                        )}
+                        <div className="flex justify-end gap-2">
+                          {c.status === 'draft' && (
+                            <Button variant="secondary" onClick={() => void openSend(c)}>
+                              <Send className="h-4 w-4" /> Send
+                            </Button>
+                          )}
+                          {c.status === 'sending' && (
+                            <Button
+                              variant="secondary"
+                              onClick={() => {
+                                setActionTarget(c);
+                                setActionType('cancel');
+                              }}
+                              title="Stop campaign"
+                            >
+                              <Ban className="h-4 w-4" /> Stop
+                            </Button>
+                          )}
+                          {c.status !== 'sending' && (
+                            <Button
+                              variant="danger"
+                              onClick={() => {
+                                setActionTarget(c);
+                                setActionType('delete');
+                              }}
+                              title="Delete campaign"
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -221,6 +271,40 @@ export function CampaignsPage() {
             </p>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={Boolean(actionTarget && actionType)}
+        onClose={() => {
+          if (!actionBusy) {
+            setActionTarget(null);
+            setActionType(null);
+          }
+        }}
+        title={actionType === 'cancel' ? 'Stop campaign' : 'Delete campaign'}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setActionTarget(null);
+                setActionType(null);
+              }}
+              disabled={actionBusy}
+            >
+              Keep
+            </Button>
+            <Button variant={actionType === 'delete' ? 'danger' : 'primary'} onClick={() => void confirmAction()} loading={actionBusy}>
+              {actionType === 'cancel' ? 'Stop campaign' : 'Delete campaign'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-brand-ink-600">
+          {actionType === 'cancel'
+            ? `Stop ${actionTarget?.name ?? 'this campaign'}? Messages already sent will remain in the log, and pending recipients will not be sent.`
+            : `Permanently delete ${actionTarget?.name ?? 'this campaign'} and its recipient list? Sent message history will be preserved.`}
+        </p>
       </Modal>
     </div>
   );
